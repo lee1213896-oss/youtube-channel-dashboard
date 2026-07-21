@@ -40,6 +40,7 @@ import {
   XCircle,
   Clock,
   AlertTriangle,
+  X,
 } from 'lucide-react';
 
 interface Credential {
@@ -80,6 +81,7 @@ export default function YouTubeAuthPage() {
   const [syncing, setSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState<string | null>(null);
   const [authorizing, setAuthorizing] = useState(false);
+  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   // New credential form
   const [newCredName, setNewCredName] = useState('');
@@ -96,6 +98,19 @@ export default function YouTubeAuthPage() {
 
   useEffect(() => {
     fetchData();
+    // Check for success/error from OAuth callback
+    const params = new URLSearchParams(window.location.search);
+    const success = params.get('success');
+    const error = params.get('error');
+    if (success) {
+      setMessage({ type: 'success', text: success });
+    } else if (error) {
+      setMessage({ type: 'error', text: error });
+    }
+    // Clean up URL params
+    if (success || error) {
+      window.history.replaceState({}, '', '/youtube-auth');
+    }
   }, []);
 
   const fetchData = async () => {
@@ -246,6 +261,17 @@ export default function YouTubeAuthPage() {
           </Button>
         </div>
       </div>
+
+      {message && (
+        <Card className={`border ${message.type === 'success' ? 'border-green-500/30 bg-green-500/5' : 'border-red-500/30 bg-red-500/5'}`}>
+          <CardContent className="p-3 flex items-center justify-between">
+            <p className={`text-sm ${message.type === 'success' ? 'text-green-400' : 'text-red-400'}`}>{message.text}</p>
+            <button onClick={() => setMessage(null)} className="text-muted-foreground hover:text-foreground">
+              <X className="h-4 w-4" />
+            </button>
+          </CardContent>
+        </Card>
+      )}
 
       {syncResult && (
         <Card className="bg-card border-border border-green-500/30">
