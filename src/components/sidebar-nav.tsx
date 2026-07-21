@@ -8,6 +8,7 @@ import {
   Tag,
   Settings,
   Youtube,
+  Shield,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -16,6 +17,7 @@ const navItems = [
   { href: '/analysis', label: '对比分析', icon: Film },
   { href: '/tags', label: '标签聚合', icon: Tag },
   { href: '/config', label: '频道配置', icon: Settings },
+  { href: '/youtube-auth', label: '频道授权', icon: Shield },
 ];
 
 export function SidebarNav() {

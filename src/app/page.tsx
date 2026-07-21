@@ -67,6 +67,7 @@ export default function DashboardPage() {
   const [filterLanguage, setFilterLanguage] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
   const [filterTag, setFilterTag] = useState('');
+  const [ytAuthCount, setYtAuthCount] = useState(0);
 
   const fetchChannels = useCallback(async () => {
     setLoading(true);
@@ -88,6 +89,9 @@ export default function DashboardPage() {
     const data = await res.json();
     setChannels(data.items);
     setTotal(data.total);
+    if (data.youtubeChannelCount !== undefined) {
+      setYtAuthCount(data.youtubeChannelCount);
+    }
     setLoading(false);
   }, [selectedDate, sortKey, sortDir, page, pageSize, keyword, filterOperator, filterGroup, filterLanguage, filterStatus, filterTag]);
 
@@ -131,6 +135,12 @@ export default function DashboardPage() {
           <h1 className="text-2xl font-bold tracking-tight">数据总览</h1>
           <p className="text-sm text-muted-foreground mt-1">
             66 个频道 | 11 个语种 | 数据日期: {selectedDate}
+            {ytAuthCount > 0 && (
+              <Link href="/youtube-auth" className="ml-3 inline-flex items-center gap-1 text-green-400 hover:text-green-300 transition-colors">
+                <span className="h-1.5 w-1.5 rounded-full bg-green-400 animate-pulse" />
+                {ytAuthCount} 个频道已授权 YouTube API
+              </Link>
+            )}
           </p>
         </div>
         <Button variant="outline" size="sm" onClick={handleExport}>
