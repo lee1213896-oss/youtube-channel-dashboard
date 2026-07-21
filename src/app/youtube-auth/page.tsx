@@ -129,13 +129,10 @@ export default function YouTubeAuthPage() {
   const handleAuthorize = async () => {
     if (credentials.length === 0) return;
     setAuthorizing(true);
-    try {
-      // Use GET to directly redirect to Google auth page
-      window.location.href = `/api/youtube/auth?credential_id=${credentials[0].id}`;
-    } catch (err) {
-      console.error('Authorization failed:', err);
-      setAuthorizing(false);
-    }
+    // Redirect to Google auth page - use window.location for full page navigation
+    window.location.href = `/api/youtube/auth?credential_id=${credentials[0].id}`;
+    // Reset loading state after 5 seconds in case redirect fails
+    setTimeout(() => setAuthorizing(false), 5000);
   };
 
   const addCredential = async () => {
