@@ -2,7 +2,7 @@
   "buildCommand": "pnpm run build",
   "outputDirectory": ".next",
   "framework": "nextjs",
-  "installCommand": "pnpm install",
+  "installCommand": "pnpm install --prod=false",
   "regions": ["hnd1"],
   "env": {
     "NEXT_PUBLIC_SUPABASE_URL": "",
