@@ -1,0 +1,36 @@
+{
+  "channels": [
+    {
+      "id": "UC1234567890",
+      "name": "示例频道 1",
+      "operator": "运营人员 A",
+      "group": "自营",
+      "language": "英语",
+      "tags": ["短剧", "言情"],
+      "status": "normal"
+    },
+    {
+      "id": "UC0987654321",
+      "name": "示例频道 2",
+      "operator": "运营人员 B",
+      "group": "代理",
+      "language": "西班牙语",
+      "tags": ["短剧", "动作"],
+      "status": "normal"
+    }
+  ],
+  "presetTagGroups": [
+    {
+      "name": "全部短剧",
+      "tags": ["短剧"]
+    },
+    {
+      "name": "英语频道",
+      "tags": ["英语"]
+    },
+    {
+      "name": "自营频道",
+      "tags": ["自营"]
+    }
+  ]
+}
