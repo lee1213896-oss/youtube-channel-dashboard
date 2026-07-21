@@ -17,15 +17,13 @@ function getSupabaseServiceRoleKey(): string | undefined {
   return getEnvVar('COZE_SUPABASE_SERVICE_ROLE_KEY') || getEnvVar('SUPABASE_SERVICE_ROLE_KEY');
 }
 
-function getSupabaseClient(token?: string): SupabaseClient {
+function getSupabaseClient(token?: string): SupabaseClient | null {
   const url = getSupabaseUrl();
   const anonKey = getSupabaseAnonKey();
 
-  if (!url) {
-    throw new Error('Supabase URL is not set. Set COZE_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_URL');
-  }
-  if (!anonKey) {
-    throw new Error('Supabase Anon Key is not set. Set COZE_SUPABASE_ANON_KEY or NEXT_PUBLIC_SUPABASE_ANON_KEY');
+  if (!url || !anonKey) {
+    // Supabase not configured, return null
+    return null;
   }
 
   let key: string;
