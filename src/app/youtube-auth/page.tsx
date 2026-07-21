@@ -79,6 +79,7 @@ export default function YouTubeAuthPage() {
   const [editingChannel, setEditingChannel] = useState<YouTubeChannel | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState<string | null>(null);
+  const [authorizing, setAuthorizing] = useState(false);
 
   // New credential form
   const [newCredName, setNewCredName] = useState('');
@@ -108,6 +109,22 @@ export default function YouTubeAuthPage() {
     setCredentials(credData.credentials || []);
     setChannels(chData.channels || []);
     setLoading(false);
+  };
+
+  const handleAuthorize = async () => {
+    if (credentials.length === 0) return;
+    setAuthorizing(true);
+    try {
+      const res = await fetch(`/api/youtube/auth?credential_id=${credentials[0].id}`);
+      const data = await res.json();
+      if (data.auth_url) {
+        window.open(data.auth_url, '_blank');
+      }
+    } catch (err) {
+      console.error('Authorization failed:', err);
+    } finally {
+      setAuthorizing(false);
+    }
   };
 
   const addCredential = async () => {
@@ -257,6 +274,25 @@ export default function YouTubeAuthPage() {
 
         {/* Authorized Channels Tab */}
         <TabsContent value="channels">
+          <div className="flex justify-end mb-4">
+            <Button
+              onClick={handleAuthorize}
+              disabled={credentials.length === 0 || authorizing}
+              className="bg-[#ff4444] hover:bg-[#ff5555] text-white"
+            >
+              {authorizing ? (
+                <>
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent mr-2" />
+                  跳转授权中...
+                </>
+              ) : (
+                <>
+                  <Link2 className="h-4 w-4 mr-2" />
+                  授权频道
+                </>
+              )}
+            </Button>
+          </div>
           <Card className="bg-card border-border">
             <CardContent className="p-0">
               {loading ? (
@@ -264,10 +300,30 @@ export default function YouTubeAuthPage() {
                   <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
                 </div>
               ) : channels.length === 0 ? (
-                <div className="flex flex-col items-center justify-center h-48 text-muted-foreground">
+                <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
                   <Link2 className="h-10 w-10 mb-3 opacity-50" />
-                  <p className="text-sm">暂无授权频道</p>
-                  <p className="text-xs mt-1">请先配置 OAuth 凭据，然后授权频道</p>
+                  <p className="text-sm mb-1">暂无授权频道</p>
+                  <p className="text-xs mb-4">请先配置 OAuth 凭据，然后点击下方按钮授权频道</p>
+                  <Button
+                    onClick={handleAuthorize}
+                    disabled={credentials.length === 0 || authorizing}
+                    className="bg-[#ff4444] hover:bg-[#ff5555] text-white"
+                  >
+                    {authorizing ? (
+                      <>
+                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent mr-2" />
+                        跳转授权中...
+                      </>
+                    ) : (
+                      <>
+                        <Link2 className="h-4 w-4 mr-2" />
+                        授权频道
+                      </>
+                    )}
+                  </Button>
+                  {credentials.length === 0 && (
+                    <p className="text-xs text-yellow-500 mt-2">请先在「OAuth 凭据」标签页中添加凭据</p>
+                  )}
                 </div>
               ) : (
                 <Table>
