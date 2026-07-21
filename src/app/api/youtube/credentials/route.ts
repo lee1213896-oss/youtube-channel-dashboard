@@ -3,13 +3,21 @@ import { getSupabaseClient } from '@/storage/database/supabase-client';
 
 // GET: List all credentials
 export async function GET() {
-  const client = getSupabaseClient();
-  const { data, error } = await client
-    .from('youtube_credentials')
-    .select('id, client_id, redirect_uri, name, is_active, created_at')
-    .order('created_at', { ascending: false });
-  if (error) throw new Error(`Query failed: ${error.message}`);
-  return NextResponse.json({ credentials: data || [] });
+  try {
+    const client = getSupabaseClient();
+    const { data, error } = await client
+      .from('youtube_credentials')
+      .select('id, client_id, redirect_uri, name, is_active, created_at')
+      .order('created_at', { ascending: false });
+    if (error) {
+      console.error('Failed to fetch credentials:', error);
+      return NextResponse.json({ credentials: [] });
+    }
+    return NextResponse.json({ credentials: data || [] });
+  } catch (error) {
+    console.error('API error:', error);
+    return NextResponse.json({ credentials: [] });
+  }
 }
 
 // POST: Create new credentials
