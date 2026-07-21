@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
 import { exchangeCodeForTokens, getChannelInfo } from '@/lib/youtube/api';
+import { getCredentials } from '../credentials/route';
 
 // GET: OAuth2 callback handler
 export async function GET(request: NextRequest) {
@@ -33,16 +34,12 @@ export async function GET(request: NextRequest) {
   try {
     const client = getSupabaseClient();
 
-    // Get the credential
-    const { data: credential, error: credError } = await client
-      .from('youtube_credentials')
-      .select('id, client_id, client_secret, redirect_uri')
-      .eq('id', parsedState.credential_id)
-      .single();
-    if (credError) throw new Error(`Query failed: ${credError.message}`);
-    if (!credential) {
+    // Use credentials from environment variables
+    const credential = getCredentials();
+
+    if (!credential.client_id || !credential.client_secret) {
       const redirectUrl = new URL('/youtube-auth', request.url);
-      redirectUrl.searchParams.set('error', '凭据未找到');
+      redirectUrl.searchParams.set('error', 'OAuth 凭据未配置');
       return NextResponse.redirect(redirectUrl);
     }
 

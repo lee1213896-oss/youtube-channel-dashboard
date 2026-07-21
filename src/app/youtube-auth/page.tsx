@@ -132,13 +132,9 @@ export default function YouTubeAuthPage() {
     }
   };
 
-  const handleAuthorize = async () => {
-    if (credentials.length === 0) return;
-    setAuthorizing(true);
-    // Redirect to Google auth page - use window.location for full page navigation
-    window.location.href = `/api/youtube/auth?credential_id=${credentials[0].id}`;
-    // Reset loading state after 5 seconds in case redirect fails
-    setTimeout(() => setAuthorizing(false), 5000);
+  const handleAuthorize = () => {
+    // Redirect to Google auth page using environment credentials
+    window.location.href = '/api/youtube/auth?credential_id=env';
   };
 
   const addCredential = async () => {
