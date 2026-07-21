@@ -324,10 +324,10 @@ export default function YouTubeAuthPage() {
                 <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
                   <Link2 className="h-10 w-10 mb-3 opacity-50" />
                   <p className="text-sm mb-1">暂无授权频道</p>
-                  <p className="text-xs mb-4">请先配置 OAuth 凭据，然后点击下方按钮授权频道</p>
+                  <p className="text-xs mb-4">点击下方按钮授权 YouTube 频道</p>
                   <Button
                     onClick={handleAuthorize}
-                    disabled={credentials.length === 0 || authorizing}
+                    disabled={authorizing}
                     className="bg-[#ff4444] hover:bg-[#ff5555] text-white"
                   >
                     {authorizing ? (
@@ -342,9 +342,6 @@ export default function YouTubeAuthPage() {
                       </>
                     )}
                   </Button>
-                  {credentials.length === 0 && (
-                    <p className="text-xs text-yellow-500 mt-2">请先在「OAuth 凭据」标签页中添加凭据</p>
-                  )}
                 </div>
               ) : (
                 <Table>
