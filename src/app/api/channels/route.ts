@@ -36,6 +36,7 @@ export async function GET(request: NextRequest) {
 
   try {
     const client = getSupabaseClient();
+    if (!client) throw new Error('Supabase not configured');
     const { data: authChannels } = await client
       .from('youtube_channels')
       .select('id, yt_channel_id, channel_name, channel_thumbnail, operator, group_name, language, tags, status, remark, sync_status')

@@ -8,6 +8,7 @@ export async function GET(
 ) {
   const { id } = await params;
   const client = getSupabaseClient();
+  if (!client) return NextResponse.json({ error: 'Supabase not configured' }, { status: 500 });
   const { data, error } = await client
     .from('youtube_channels')
     .select('*')
@@ -28,6 +29,7 @@ export async function PUT(
   const { id } = await params;
   const body = await request.json();
   const client = getSupabaseClient();
+  if (!client) return NextResponse.json({ error: 'Supabase not configured' }, { status: 500 });
 
   // Only allow updating config fields, not tokens
   const allowedFields = ['operator', 'group_name', 'language', 'tags', 'status', 'remark', 'is_active'];
@@ -55,6 +57,7 @@ export async function DELETE(
 ) {
   const { id } = await params;
   const client = getSupabaseClient();
+  if (!client) return NextResponse.json({ error: 'Supabase not configured' }, { status: 500 });
   const { error } = await client
     .from('youtube_channels')
     .delete()

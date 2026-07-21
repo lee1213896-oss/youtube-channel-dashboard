@@ -32,6 +32,7 @@ export async function GET(request: NextRequest) {
 
   try {
     const client = getSupabaseClient();
+    if (!client) throw new Error('Supabase not configured');
 
     // Use credentials from environment variables
     const credential = {

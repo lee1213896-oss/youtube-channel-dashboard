@@ -9,6 +9,7 @@ export async function GET(
 
   try {
     const client = getSupabaseClient();
+    if (!client) throw new Error('Supabase not configured');
     const { data: channel } = await client
       .from('youtube_channels')
       .select('*')
@@ -63,6 +64,7 @@ export async function PUT(
 
   try {
     const client = getSupabaseClient();
+    if (!client) throw new Error('Supabase not configured');
     const updateData: Record<string, unknown> = {};
     if (body.operator !== undefined) updateData.operator = body.operator;
     if (body.group !== undefined) updateData.group_name = body.group;

@@ -5,6 +5,7 @@ import { refreshAccessToken, getChannelAnalytics, getChannelInfo } from '@/lib/y
 // POST: Sync data from YouTube API for a specific channel or all channels
 export async function POST(request: NextRequest) {
   const client = getSupabaseClient();
+  if (!client) return NextResponse.json({ error: 'Supabase not configured' }, { status: 500 });
   const body = await request.json();
   const { channel_id, start_date, end_date } = body;
 

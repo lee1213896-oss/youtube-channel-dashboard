@@ -9,6 +9,7 @@ export async function GET(
 
   try {
     const client = getSupabaseClient();
+    if (!client) throw new Error('Supabase not configured');
     const { data: videos } = await client
       .from('youtube_videos')
       .select('*')

@@ -19,6 +19,7 @@ export async function GET(request: NextRequest) {
 
   try {
     const client = getSupabaseClient();
+    if (!client) throw new Error('Supabase not configured');
     let query = client
       .from('youtube_channels')
       .select('id, tags, group_name')
@@ -45,6 +46,7 @@ export async function GET(request: NextRequest) {
 
     try {
       const client = getSupabaseClient();
+      if (!client) throw new Error('Supabase not configured');
       const { data: stats } = await client
         .from('youtube_channel_stats')
         .select('channel_id, stat_date, views, estimated_revenue, subscribers_gained, subscribers_lost')
