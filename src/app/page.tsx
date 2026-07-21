@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { Channel } from '@/lib/types';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -26,24 +27,15 @@ import {
   ArrowDown,
   Download,
   Search,
+  ChevronLeft,
+  ChevronRight,
   Eye,
 } from 'lucide-react';
 import Link from 'next/link';
+import { formatNumber, formatCurrency } from '@/lib/format';
 
-interface Channel {
-  id: string;
-  name: string;
-  thumbnail: string;
-  operator: string;
-  group: string;
-  language: string;
-  tags: string[];
-  status: string;
-  viewCount: string;
-  subscriberCount: string;
-  videoCount: string;
-  publishedAt: string;
-  country: string;
+interface ChannelWithTrend extends Channel {
+  trend: { date: string; views: number; revenue: number }[];
 }
 
 const statusLabels: Record<string, string> = {
@@ -60,92 +52,129 @@ const statusColors: Record<string, string> = {
   abandoned: 'bg-red-500/10 text-red-400 border-red-500/20',
 };
 
-function formatNumber(num: string | number): string {
-  const n = typeof num === 'string' ? parseInt(num) || 0 : num;
-  if (n >= 100000000) return (n / 100000000).toFixed(2) + '亿';
-  if (n >= 10000) return (n / 10000).toFixed(1) + '万';
-  return n.toLocaleString();
-}
-
 export default function DashboardPage() {
-  const [channels, setChannels] = useState<Channel[]>([]);
+  const [channels, setChannels] = useState<ChannelWithTrend[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [pageSize] = useState(20);
   const [loading, setLoading] = useState(true);
+  const [sortKey, setSortKey] = useState<string>('dailyViews');
+  const [sortDir, setSortDir] = useState<string>('desc');
+  const [selectedDate, setSelectedDate] = useState('2026-07-20');
   const [keyword, setKeyword] = useState('');
+  const [filterOperator, setFilterOperator] = useState('');
   const [filterGroup, setFilterGroup] = useState('');
   const [filterLanguage, setFilterLanguage] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
+  const [filterTag, setFilterTag] = useState('');
+  const [ytAuthCount, setYtAuthCount] = useState(0);
 
   const fetchChannels = useCallback(async () => {
     setLoading(true);
-    try {
-      const params = new URLSearchParams();
-      if (keyword) params.set('search', keyword);
-      if (filterGroup) params.set('group', filterGroup);
-      if (filterLanguage) params.set('language', filterLanguage);
-      if (filterStatus) params.set('status', filterStatus);
+    const params = new URLSearchParams({
+      date: selectedDate,
+      sortKey,
+      sortDir,
+      page: String(page),
+      pageSize: String(pageSize),
+    });
+    if (keyword) params.set('keyword', keyword);
+    if (filterOperator) params.set('operator', filterOperator);
+    if (filterGroup) params.set('group', filterGroup);
+    if (filterLanguage) params.set('language', filterLanguage);
+    if (filterStatus) params.set('status', filterStatus);
+    if (filterTag) params.set('tag', filterTag);
 
-      const res = await fetch(`/api/channels?${params}`);
-      const data = await res.json();
-      setChannels(data.channels || []);
-    } catch (error) {
-      console.error('Failed to fetch channels:', error);
-    } finally {
-      setLoading(false);
+    const res = await fetch(`/api/channels?${params}`);
+    const data = await res.json();
+    setChannels(data.items);
+    setTotal(data.total);
+    if (data.youtubeChannelCount !== undefined) {
+      setYtAuthCount(data.youtubeChannelCount);
     }
-  }, [keyword, filterGroup, filterLanguage, filterStatus]);
+    setLoading(false);
+  }, [selectedDate, sortKey, sortDir, page, pageSize, keyword, filterOperator, filterGroup, filterLanguage, filterStatus, filterTag]);
 
   useEffect(() => {
     fetchChannels();
   }, [fetchChannels]);
 
-  const totalViews = channels.reduce((sum, ch) => sum + (parseInt(ch.viewCount) || 0), 0);
-  const totalSubscribers = channels.reduce((sum, ch) => sum + (parseInt(ch.subscriberCount) || 0), 0);
-  const totalVideos = channels.reduce((sum, ch) => sum + (parseInt(ch.videoCount) || 0), 0);
+  const handleSort = (key: string) => {
+    if (sortKey === key) {
+      setSortDir(sortDir === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortKey(key);
+      setSortDir('desc');
+    }
+    setPage(1);
+  };
+
+  const SortIcon = ({ columnKey }: { columnKey: string }) => {
+    if (sortKey !== columnKey) return <ArrowUpDown className="ml-1 h-3 w-3 text-muted-foreground" />;
+    return sortDir === 'asc'
+      ? <ArrowUp className="ml-1 h-3 w-3 text-primary" />
+      : <ArrowDown className="ml-1 h-3 w-3 text-primary" />;
+  };
+
+  const totalPages = Math.ceil(total / pageSize);
+
+  const handleExport = () => {
+    window.open('/api/export?type=channels', '_blank');
+  };
+
+  // Summary stats
+  const totalViews = channels.reduce((s, c) => s + c.dailyViews, 0);
+  const totalRevenue = channels.reduce((s, c) => s + c.dailyRevenue, 0);
+  const totalSubChange = channels.reduce((s, c) => s + c.dailySubChange, 0);
 
   return (
     <div className="p-6 space-y-6">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">数据总览</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            YouTube 频道数据监控与分析
+            66 个频道 | 11 个语种 | 数据日期: {selectedDate}
+            {ytAuthCount > 0 && (
+              <Link href="/youtube-auth" className="ml-3 inline-flex items-center gap-1 text-green-400 hover:text-green-300 transition-colors">
+                <span className="h-1.5 w-1.5 rounded-full bg-green-400 animate-pulse" />
+                {ytAuthCount} 个频道已授权 YouTube API
+              </Link>
+            )}
           </p>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          className="border-border"
-          onClick={() => window.open('/api/export', '_blank')}
-        >
-          <Download className="h-4 w-4 mr-2" />
+        <Button variant="outline" size="sm" onClick={handleExport}>
+          <Download className="mr-2 h-4 w-4" />
           导出 Excel
         </Button>
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-4 gap-4">
         <Card className="bg-card border-border">
           <CardContent className="p-4">
-            <div className="text-sm text-muted-foreground">频道总数</div>
-            <div className="text-2xl font-bold mt-1 tabular-nums">{channels.length}</div>
+            <p className="text-xs text-muted-foreground">当日总播放量</p>
+            <p className="text-2xl font-bold tabular-nums mt-1">{formatNumber(totalViews)}</p>
           </CardContent>
         </Card>
         <Card className="bg-card border-border">
           <CardContent className="p-4">
-            <div className="text-sm text-muted-foreground">总播放量</div>
-            <div className="text-2xl font-bold mt-1 tabular-nums">{formatNumber(totalViews)}</div>
+            <p className="text-xs text-muted-foreground">当日总收益 (USD)</p>
+            <p className="text-2xl font-bold tabular-nums mt-1 text-green-400">{formatCurrency(totalRevenue)}</p>
           </CardContent>
         </Card>
         <Card className="bg-card border-border">
           <CardContent className="p-4">
-            <div className="text-sm text-muted-foreground">总订阅数</div>
-            <div className="text-2xl font-bold mt-1 tabular-nums">{formatNumber(totalSubscribers)}</div>
+            <p className="text-xs text-muted-foreground">日订阅净增长</p>
+            <p className={`text-2xl font-bold tabular-nums mt-1 ${totalSubChange >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+              {totalSubChange >= 0 ? '+' : ''}{formatNumber(totalSubChange)}
+            </p>
           </CardContent>
         </Card>
         <Card className="bg-card border-border">
           <CardContent className="p-4">
-            <div className="text-sm text-muted-foreground">总视频数</div>
-            <div className="text-2xl font-bold mt-1 tabular-nums">{formatNumber(totalVideos)}</div>
+            <p className="text-xs text-muted-foreground">展示频道数</p>
+            <p className="text-2xl font-bold tabular-nums mt-1">{total}</p>
           </CardContent>
         </Card>
       </div>
@@ -153,140 +182,217 @@ export default function DashboardPage() {
       {/* Filters */}
       <Card className="bg-card border-border">
         <CardContent className="p-4">
-          <div className="flex flex-wrap gap-3">
-            <div className="relative flex-1 min-w-[200px]">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <div className="flex flex-wrap gap-3 items-center">
+            <div className="relative">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="搜索频道名称或运营人员..."
+                placeholder="搜索频道名称/ID..."
+                className="pl-8 w-56 bg-secondary border-border h-9"
                 value={keyword}
-                onChange={(e) => setKeyword(e.target.value)}
-                className="pl-9 bg-background border-border"
+                onChange={(e) => { setKeyword(e.target.value); setPage(1); }}
               />
             </div>
-            <Select value={filterGroup} onValueChange={setFilterGroup}>
-              <SelectTrigger className="w-[120px] bg-background border-border">
+            <Input
+              type="date"
+              value={selectedDate}
+              onChange={(e) => setSelectedDate(e.target.value)}
+              className="w-40 bg-secondary border-border h-9"
+            />
+            <Select value={filterOperator} onValueChange={(v) => { setFilterOperator(v === 'all' ? '' : v); setPage(1); }}>
+              <SelectTrigger className="w-32 bg-secondary border-border h-9">
+                <SelectValue placeholder="运营人员" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">全部人员</SelectItem>
+                <SelectItem value="荘华">荘华</SelectItem>
+                <SelectItem value="金智慧">金智慧</SelectItem>
+                <SelectItem value="王俊杰">王俊杰</SelectItem>
+                <SelectItem value="方柯">方柯</SelectItem>
+                <SelectItem value="袁宇婷">袁宇婷</SelectItem>
+                <SelectItem value="周毓醒">周毓醒</SelectItem>
+                <SelectItem value="关佳慧">关佳慧</SelectItem>
+                <SelectItem value="莫春霞">莫春霞</SelectItem>
+                <SelectItem value="代运营A组">代运营A组</SelectItem>
+                <SelectItem value="代运营B组">代运营B组</SelectItem>
+                <SelectItem value="代运营C组">代运营C组</SelectItem>
+                <SelectItem value="代运营D组">代运营D组</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={filterGroup} onValueChange={(v) => { setFilterGroup(v === 'all' ? '' : v); setPage(1); }}>
+              <SelectTrigger className="w-28 bg-secondary border-border h-9">
                 <SelectValue placeholder="分组" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">全部分组</SelectItem>
-                <SelectItem value="自营">自营</SelectItem>
-                <SelectItem value="代理">代理</SelectItem>
+                <SelectItem value="all">全部分组</SelectItem>
+                <SelectItem value="正职组">正职组</SelectItem>
+                <SelectItem value="实习生组">实习生组</SelectItem>
+                <SelectItem value="代运营组">代运营组</SelectItem>
               </SelectContent>
             </Select>
-            <Select value={filterLanguage} onValueChange={setFilterLanguage}>
-              <SelectTrigger className="w-[120px] bg-background border-border">
+            <Select value={filterLanguage} onValueChange={(v) => { setFilterLanguage(v === 'all' ? '' : v); setPage(1); }}>
+              <SelectTrigger className="w-28 bg-secondary border-border h-9">
                 <SelectValue placeholder="语种" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">全部语种</SelectItem>
-                <SelectItem value="英语">英语</SelectItem>
-                <SelectItem value="西班牙语">西班牙语</SelectItem>
-                <SelectItem value="葡萄牙语">葡萄牙语</SelectItem>
-                <SelectItem value="阿拉伯语">阿拉伯语</SelectItem>
-                <SelectItem value="印尼语">印尼语</SelectItem>
-                <SelectItem value="泰语">泰语</SelectItem>
-                <SelectItem value="越南语">越南语</SelectItem>
-                <SelectItem value="日语">日语</SelectItem>
-                <SelectItem value="韩语">韩语</SelectItem>
-                <SelectItem value="法语">法语</SelectItem>
-                <SelectItem value="德语">德语</SelectItem>
+                <SelectItem value="all">全部语种</SelectItem>
+                {['英语', '西班牙语', '葡萄牙语', '印尼语', '日语', '韩语', '泰语', '越南语', '阿拉伯语', '法语', '中文'].map(l => (
+                  <SelectItem key={l} value={l}>{l}</SelectItem>
+                ))}
               </SelectContent>
             </Select>
-            <Select value={filterStatus} onValueChange={setFilterStatus}>
-              <SelectTrigger className="w-[120px] bg-background border-border">
+            <Select value={filterStatus} onValueChange={(v) => { setFilterStatus(v === 'all' ? '' : v); setPage(1); }}>
+              <SelectTrigger className="w-28 bg-secondary border-border h-9">
                 <SelectValue placeholder="状态" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">全部状态</SelectItem>
+                <SelectItem value="all">全部状态</SelectItem>
                 <SelectItem value="normal">正常运营</SelectItem>
                 <SelectItem value="cold_start">冷启中</SelectItem>
                 <SelectItem value="paused">暂停</SelectItem>
                 <SelectItem value="abandoned">废弃</SelectItem>
               </SelectContent>
             </Select>
+            <Select value={filterTag} onValueChange={(v) => { setFilterTag(v === 'all' ? '' : v); setPage(1); }}>
+              <SelectTrigger className="w-28 bg-secondary border-border h-9">
+                <SelectValue placeholder="标签" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">全部标签</SelectItem>
+                <SelectItem value="短剧">短剧</SelectItem>
+                <SelectItem value="AI真人">AI真人</SelectItem>
+                <SelectItem value="动态漫">动态漫</SelectItem>
+                <SelectItem value="冷启中">冷启中</SelectItem>
+                <SelectItem value="重点频道">重点频道</SelectItem>
+                <SelectItem value="新频道">新频道</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </CardContent>
       </Card>
 
-      {/* Channel Table */}
+      {/* Table */}
       <Card className="bg-card border-border">
         <CardContent className="p-0">
           {loading ? (
             <div className="flex items-center justify-center h-64">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-            </div>
-          ) : channels.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
-              <Eye className="h-10 w-10 mb-3 opacity-50" />
-              <p className="text-sm">暂无频道数据</p>
-              <p className="text-xs mt-1">请配置 YOUTUBE_API_KEY 环境变量并添加频道到 channel-config.json</p>
+              <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
             </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow className="border-border hover:bg-transparent">
-                  <TableHead className="w-[300px]">频道</TableHead>
-                  <TableHead>运营人员</TableHead>
-                  <TableHead>分组</TableHead>
-                  <TableHead>语种</TableHead>
-                  <TableHead className="text-right">播放量</TableHead>
-                  <TableHead className="text-right">订阅数</TableHead>
-                  <TableHead className="text-right">视频数</TableHead>
-                  <TableHead>状态</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {channels.map((channel) => (
-                  <TableRow
-                    key={channel.id}
-                    className="border-border hover:bg-accent/50 cursor-pointer"
-                    onClick={() => window.location.href = `/channels/${channel.id}`}
-                  >
-                    <TableCell>
-                      <div className="flex items-center gap-3">
-                        {channel.thumbnail && (
-                          <img
-                            src={channel.thumbnail}
-                            alt={channel.name}
-                            className="w-10 h-10 rounded-full object-cover"
-                          />
-                        )}
-                        <div>
-                          <div className="font-medium">{channel.name}</div>
-                          <div className="text-xs text-muted-foreground">{channel.id}</div>
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>{channel.operator || '-'}</TableCell>
-                    <TableCell>
-                      {channel.group && (
-                        <Badge variant="outline" className="border-border">
-                          {channel.group}
-                        </Badge>
-                      )}
-                    </TableCell>
-                    <TableCell>{channel.language || '-'}</TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {formatNumber(channel.viewCount)}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {formatNumber(channel.subscriberCount)}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {formatNumber(channel.videoCount)}
-                    </TableCell>
-                    <TableCell>
-                      <Badge
-                        variant="outline"
-                        className={statusColors[channel.status] || statusColors.normal}
-                      >
-                        {statusLabels[channel.status] || channel.status}
-                      </Badge>
-                    </TableCell>
+            <>
+              <Table>
+                <TableHeader>
+                  <TableRow className="border-border hover:bg-transparent">
+                    <TableHead className="text-muted-foreground w-8">#</TableHead>
+                    <TableHead className="text-muted-foreground">频道名称</TableHead>
+                    <TableHead className="text-muted-foreground">运营人员</TableHead>
+                    <TableHead className="text-muted-foreground">分组</TableHead>
+                    <TableHead className="text-muted-foreground">语种</TableHead>
+                    <TableHead className="text-muted-foreground">标签</TableHead>
+                    <TableHead className="text-muted-foreground">状态</TableHead>
+                    <TableHead className="text-muted-foreground text-right cursor-pointer" onClick={() => handleSort('dailyViews')}>
+                      <span className="flex items-center justify-end">日播放量<SortIcon columnKey="dailyViews" /></span>
+                    </TableHead>
+                    <TableHead className="text-muted-foreground text-right cursor-pointer" onClick={() => handleSort('dailyRevenue')}>
+                      <span className="flex items-center justify-end">日收益<SortIcon columnKey="dailyRevenue" /></span>
+                    </TableHead>
+                    <TableHead className="text-muted-foreground text-right cursor-pointer" onClick={() => handleSort('subscribers')}>
+                      <span className="flex items-center justify-end">订阅量<SortIcon columnKey="subscribers" /></span>
+                    </TableHead>
+                    <TableHead className="text-muted-foreground text-right cursor-pointer" onClick={() => handleSort('dailySubChange')}>
+                      <span className="flex items-center justify-end">日订阅增长<SortIcon columnKey="dailySubChange" /></span>
+                    </TableHead>
+                    <TableHead className="text-muted-foreground text-center">操作</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {channels.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={11} className="text-center py-12">
+                        <p className="text-muted-foreground">暂无已授权的 YouTube 频道</p>
+                        <p className="text-sm text-muted-foreground mt-1">
+                          请前往「频道授权」页面添加并授权 YouTube 频道
+                        </p>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                  {channels.map((ch, idx) => (
+                    <TableRow key={ch.id} className="border-border hover:bg-accent/30">
+                      <TableCell className="text-muted-foreground tabular-nums">{(page - 1) * pageSize + idx + 1}</TableCell>
+                      <TableCell>
+                        <div>
+                          <p className="font-medium text-sm">{ch.name}</p>
+                          <p className="text-xs text-muted-foreground">{ch.channelId}</p>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-sm">{ch.operator}</TableCell>
+                      <TableCell className="text-sm">{ch.group}</TableCell>
+                      <TableCell className="text-sm">{ch.language}</TableCell>
+                      <TableCell>
+                        <div className="flex flex-wrap gap-1">
+                          {ch.tags.map(tag => (
+                            <Badge key={tag} variant="outline" className="text-xs px-1.5 py-0 border-border text-muted-foreground">
+                              {tag}
+                            </Badge>
+                          ))}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge className={`text-xs ${statusColors[ch.status]}`}>
+                          {statusLabels[ch.status]}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums text-sm font-medium">
+                        {formatNumber(ch.dailyViews)}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums text-sm text-green-400">
+                        ${ch.dailyRevenue.toFixed(2)}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums text-sm">
+                        {formatNumber(ch.subscribers)}
+                      </TableCell>
+                      <TableCell className={`text-right tabular-nums text-sm ${ch.dailySubChange >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                        {ch.dailySubChange >= 0 ? '+' : ''}{formatNumber(ch.dailySubChange)}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <Link href={`/channels/${ch.id}`}>
+                          <Button variant="ghost" size="sm" className="h-7 px-2">
+                            <Eye className="h-3.5 w-3.5 mr-1" />
+                            详情
+                          </Button>
+                        </Link>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+
+              {/* Pagination */}
+              <div className="flex items-center justify-between border-t border-border px-4 py-3">
+                <p className="text-sm text-muted-foreground">
+                  共 {total} 条 | 第 {page}/{totalPages} 页
+                </p>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={page <= 1}
+                    onClick={() => setPage(page - 1)}
+                    className="border-border"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={page >= totalPages}
+                    onClick={() => setPage(page + 1)}
+                    className="border-border"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            </>
           )}
         </CardContent>
       </Card>

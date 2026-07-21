@@ -1,262 +1,306 @@
-import channelConfig from '@/channel-config.json';
+// YouTube OAuth2 & Data API integration service
 
-// YouTube Data API v3 configuration
-const YOUTUBE_API_KEY = process.env.YOUTUBE_API_KEY || '';
+const GOOGLE_AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
+const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token';
 const YOUTUBE_API_BASE = 'https://www.googleapis.com/youtube/v3';
+const YOUTUBE_ANALYTICS_BASE = 'https://youtubeanalytics.googleapis.com/v2';
 
-interface YouTubeAPIResponse {
-  items: any[];
-  nextPageToken?: string;
-  pageInfo?: {
-    totalResults: number;
-    resultsPerPage: number;
-  };
+const YOUTUBE_SCOPES = [
+  'https://www.googleapis.com/auth/youtube.readonly',
+  'https://www.googleapis.com/auth/youtubepartner',
+  'https://www.googleapis.com/auth/youtube.force-ssl',
+].join(' ');
+
+export interface OAuthCredentials {
+  client_id: string;
+  client_secret: string;
+  redirect_uri: string;
 }
 
-interface ChannelData {
+export interface TokenResponse {
+  access_token: string;
+  refresh_token?: string;
+  expires_in: number;
+  token_type: string;
+  scope: string;
+}
+
+export interface YouTubeChannelInfo {
   id: string;
-  name: string;
+  title: string;
   thumbnail: string;
-  customUrl: string;
-  description: string;
+  subscriberCount: number;
+  viewCount: number;
+  videoCount: number;
   publishedAt: string;
-  country: string;
-  stats: {
-    viewCount: string;
-    subscriberCount: string;
-    videoCount: string;
-  };
 }
 
-interface VideoData {
+export interface YouTubeVideoInfo {
   id: string;
   title: string;
   description: string;
-  thumbnail: string;
   publishedAt: string;
+  thumbnailUrl: string;
+  viewCount: number;
+  likeCount: number;
+  commentCount: number;
   duration: string;
-  stats: {
-    viewCount: string;
-    likeCount: string;
-    commentCount: string;
-  };
 }
 
-// Fetch channel data from YouTube API
-async function fetchChannelData(channelId: string): Promise<ChannelData | null> {
-  if (!YOUTUBE_API_KEY) {
-    console.warn('YouTube API Key not configured');
-    return null;
-  }
-
-  try {
-    const url = `${YOUTUBE_API_BASE}/channels?part=snippet,statistics,contentDetails&id=${channelId}&key=${YOUTUBE_API_KEY}`;
-    const response = await fetch(url);
-    
-    if (!response.ok) {
-      console.error(`YouTube API error: ${response.status}`);
-      return null;
-    }
-
-    const data: YouTubeAPIResponse = await response.json();
-    
-    if (!data.items || data.items.length === 0) {
-      return null;
-    }
-
-    const item = data.items[0];
-    return {
-      id: item.id,
-      name: item.snippet.title,
-      thumbnail: item.snippet.thumbnails?.high?.url || item.snippet.thumbnails?.default?.url || '',
-      customUrl: item.snippet.customUrl || '',
-      description: item.snippet.description || '',
-      publishedAt: item.snippet.publishedAt,
-      country: item.snippet.country || '',
-      stats: {
-        viewCount: item.statistics.viewCount || '0',
-        subscriberCount: item.statistics.subscriberCount || '0',
-        videoCount: item.statistics.videoCount || '0',
-      },
-    };
-  } catch (error) {
-    console.error('Failed to fetch channel data:', error);
-    return null;
-  }
+export interface YouTubeAnalyticsRow {
+  date: string;
+  views: number;
+  estimatedRevenue: number;
+  subscribersGained: number;
+  subscribersLost: number;
+  watchTimeMinutes: number;
+  averageViewDuration: number;
+  likes: number;
+  comments: number;
+  shares: number;
 }
 
-// Fetch multiple channels data
-async function fetchChannelsData(channelIds: string[]): Promise<ChannelData[]> {
-  const results: ChannelData[] = [];
-  
-  // YouTube API allows max 50 IDs per request
-  for (let i = 0; i < channelIds.length; i += 50) {
-    const batch = channelIds.slice(i, i + 50);
-    const ids = batch.join(',');
-    
-    try {
-      const url = `${YOUTUBE_API_BASE}/channels?part=snippet,statistics,contentDetails&id=${ids}&key=${YOUTUBE_API_KEY}`;
-      const response = await fetch(url);
-      
-      if (!response.ok) {
-        console.error(`YouTube API error: ${response.status}`);
-        continue;
-      }
-
-      const data: YouTubeAPIResponse = await response.json();
-      
-      if (data.items) {
-        for (const item of data.items) {
-          results.push({
-            id: item.id,
-            name: item.snippet.title,
-            thumbnail: item.snippet.thumbnails?.high?.url || item.snippet.thumbnails?.default?.url || '',
-            customUrl: item.snippet.customUrl || '',
-            description: item.snippet.description || '',
-            publishedAt: item.snippet.publishedAt,
-            country: item.snippet.country || '',
-            stats: {
-              viewCount: item.statistics.viewCount || '0',
-              subscriberCount: item.statistics.subscriberCount || '0',
-              videoCount: item.statistics.videoCount || '0',
-            },
-          });
-        }
-      }
-    } catch (error) {
-      console.error('Failed to fetch batch channels:', error);
-    }
-  }
-  
-  return results;
-}
-
-// Fetch video list for a channel
-async function fetchChannelVideos(channelId: string, maxResults: number = 50): Promise<VideoData[]> {
-  if (!YOUTUBE_API_KEY) {
-    return [];
-  }
-
-  try {
-    // First get uploads playlist ID
-    const channelUrl = `${YOUTUBE_API_BASE}/channels?part=contentDetails&id=${channelId}&key=${YOUTUBE_API_KEY}`;
-    const channelResponse = await fetch(channelUrl);
-    
-    if (!channelResponse.ok) {
-      return [];
-    }
-
-    const channelData: YouTubeAPIResponse = await channelResponse.json();
-    if (!channelData.items || channelData.items.length === 0) {
-      return [];
-    }
-
-    const uploadsPlaylistId = channelData.items[0].contentDetails.relatedPlaylists.uploads;
-
-    // Then fetch videos from uploads playlist
-    const videosUrl = `${YOUTUBE_API_BASE}/playlistItems?part=snippet,contentDetails&playlistId=${uploadsPlaylistId}&maxResults=${maxResults}&key=${YOUTUBE_API_KEY}`;
-    const videosResponse = await fetch(videosUrl);
-    
-    if (!videosResponse.ok) {
-      return [];
-    }
-
-    const videosData: YouTubeAPIResponse = await videosResponse.json();
-    
-    if (!videosData.items || videosData.items.length === 0) {
-      return [];
-    }
-
-    // Get video IDs for statistics
-    const videoIds = videosData.items.map(item => item.contentDetails.videoId).join(',');
-    const statsUrl = `${YOUTUBE_API_BASE}/videos?part=statistics&id=${videoIds}&key=${YOUTUBE_API_KEY}`;
-    const statsResponse = await fetch(statsUrl);
-    
-    const statsData: YouTubeAPIResponse = await statsResponse.json();
-    const statsMap = new Map<string, any>();
-    
-    if (statsData.items) {
-      for (const item of statsData.items) {
-        statsMap.set(item.id, item.statistics);
-      }
-    }
-
-    return videosData.items.map(item => ({
-      id: item.contentDetails.videoId,
-      title: item.snippet.title,
-      description: item.snippet.description || '',
-      thumbnail: item.snippet.thumbnails?.high?.url || item.snippet.thumbnails?.default?.url || '',
-      publishedAt: item.snippet.publishedAt,
-      duration: '', // Duration requires separate API call
-      stats: {
-        viewCount: statsMap.get(item.contentDetails.videoId)?.viewCount || '0',
-        likeCount: statsMap.get(item.contentDetails.videoId)?.likeCount || '0',
-        commentCount: statsMap.get(item.contentDetails.videoId)?.commentCount || '0',
-      },
-    }));
-  } catch (error) {
-    console.error('Failed to fetch channel videos:', error);
-    return [];
-  }
-}
-
-// Get all configured channels with their data
-export async function getAllChannels(): Promise<any[]> {
-  const channelIds = channelConfig.channels.map(ch => ch.id);
-  const youtubeData = await fetchChannelsData(channelIds);
-  
-  // Merge with config data
-  return channelConfig.channels.map(config => {
-    const ytData = youtubeData.find(yt => yt.id === config.id);
-    return {
-      id: config.id,
-      name: ytData?.name || config.name,
-      thumbnail: ytData?.thumbnail || '',
-      operator: config.operator,
-      group: config.group,
-      language: config.language,
-      tags: config.tags,
-      status: config.status,
-      viewCount: ytData?.stats.viewCount || '0',
-      subscriberCount: ytData?.stats.subscriberCount || '0',
-      videoCount: ytData?.stats.videoCount || '0',
-      publishedAt: ytData?.publishedAt || '',
-      country: ytData?.country || '',
-    };
+// Generate the OAuth2 authorization URL
+export function generateAuthUrl(credentials: OAuthCredentials, state?: string): string {
+  const params = new URLSearchParams({
+    client_id: credentials.client_id,
+    redirect_uri: credentials.redirect_uri,
+    response_type: 'code',
+    scope: YOUTUBE_SCOPES,
+    access_type: 'offline',
+    prompt: 'consent',
+    include_granted_scopes: 'true',
   });
+  if (state) params.set('state', state);
+  return `${GOOGLE_AUTH_URL}?${params.toString()}`;
 }
 
-// Get single channel detail
-export async function getChannelDetail(channelId: string): Promise<any> {
-  const config = channelConfig.channels.find(ch => ch.id === channelId);
-  const ytData = await fetchChannelData(channelId);
-  
-  if (!ytData) {
-    return null;
+// Exchange authorization code for tokens
+export async function exchangeCodeForTokens(
+  code: string,
+  credentials: OAuthCredentials
+): Promise<TokenResponse> {
+  const response = await fetch(GOOGLE_TOKEN_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      code,
+      client_id: credentials.client_id,
+      client_secret: credentials.client_secret,
+      redirect_uri: credentials.redirect_uri,
+      grant_type: 'authorization_code',
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`Token exchange failed: ${error}`);
   }
 
-  return {
+  return response.json();
+}
+
+// Refresh an expired access token
+export async function refreshAccessToken(
+  refreshToken: string,
+  credentials: OAuthCredentials
+): Promise<TokenResponse> {
+  const response = await fetch(GOOGLE_TOKEN_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      refresh_token: refreshToken,
+      client_id: credentials.client_id,
+      client_secret: credentials.client_secret,
+      grant_type: 'refresh_token',
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`Token refresh failed: ${error}`);
+  }
+
+  const data = await response.json();
+  // Refresh response doesn't include a new refresh_token
+  return { ...data, refresh_token: refreshToken };
+}
+
+// Get channel info from YouTube Data API
+export async function getChannelInfo(
+  accessToken: string,
+  channelId?: string,
+  mine: boolean = false
+): Promise<YouTubeChannelInfo[]> {
+  const params = new URLSearchParams({
+    part: 'snippet,statistics,contentDetails',
+  });
+  if (mine) {
+    params.set('mine', 'true');
+  } else if (channelId) {
+    params.set('id', channelId);
+  }
+
+  const response = await fetch(`${YOUTUBE_API_BASE}/channels?${params}`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(`YouTube API error: ${error.error?.message || response.statusText}`);
+  }
+
+  const data = await response.json();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (data.items || []).map((item: any) => ({
+    id: item.id as string,
+    title: item.snippet?.title || '',
+    thumbnail: item.snippet?.thumbnails?.default?.url || '',
+    subscriberCount: parseInt(item.statistics?.subscriberCount || '0'),
+    viewCount: parseInt(item.statistics?.viewCount || '0'),
+    videoCount: parseInt(item.statistics?.videoCount || '0'),
+    publishedAt: item.snippet?.publishedAt || '',
+  }));
+}
+
+// Get videos from a channel
+export async function getChannelVideos(
+  accessToken: string,
+  channelId: string,
+  maxResults: number = 50,
+  pageToken?: string
+): Promise<{ videos: YouTubeVideoInfo[]; nextPageToken?: string }> {
+  // First get the uploads playlist ID
+  const chParams = new URLSearchParams({
+    part: 'contentDetails',
     id: channelId,
-    name: ytData.name,
-    thumbnail: ytData.thumbnail,
-    customUrl: ytData.customUrl,
-    description: ytData.description,
-    publishedAt: ytData.publishedAt,
-    country: ytData.country,
-    operator: config?.operator || '',
-    group: config?.group || '',
-    language: config?.language || '',
-    tags: config?.tags || [],
-    status: config?.status || 'normal',
-    viewCount: ytData.stats.viewCount,
-    subscriberCount: ytData.stats.subscriberCount,
-    videoCount: ytData.stats.videoCount,
-  };
+  });
+  const chResponse = await fetch(`${YOUTUBE_API_BASE}/channels?${chParams}`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!chResponse.ok) {
+    throw new Error(`Failed to get channel: ${chResponse.statusText}`);
+  }
+  const chData = await chResponse.json();
+  const uploadsPlaylistId = chData.items?.[0]?.contentDetails?.relatedPlaylists?.uploads;
+  if (!uploadsPlaylistId) {
+    return { videos: [] };
+  }
+
+  // Then get videos from the uploads playlist
+  const plParams = new URLSearchParams({
+    part: 'snippet,contentDetails',
+    playlistId: uploadsPlaylistId,
+    maxResults: String(maxResults),
+  });
+  if (pageToken) plParams.set('pageToken', pageToken);
+
+  const plResponse = await fetch(`${YOUTUBE_API_BASE}/playlistItems?${plParams}`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!plResponse.ok) {
+    throw new Error(`Failed to get videos: ${plResponse.statusText}`);
+  }
+  const plData = await plResponse.json();
+
+  const videoIds = (plData.items || [])
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    .map((item: any) => item.contentDetails?.videoId)
+    .filter(Boolean)
+    .join(',');
+
+  if (!videoIds) return { videos: [], nextPageToken: plData.nextPageToken };
+
+  // Get video statistics
+  const vidParams = new URLSearchParams({
+    part: 'snippet,statistics,contentDetails',
+    id: videoIds,
+  });
+  const vidResponse = await fetch(`${YOUTUBE_API_BASE}/videos?${vidParams}`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!vidResponse.ok) {
+    throw new Error(`Failed to get video stats: ${vidResponse.statusText}`);
+  }
+  const vidData = await vidResponse.json();
+
+  const videos: YouTubeVideoInfo[] = (vidData.items || []).map((item: any) => ({
+    id: item.id as string,
+    title: item.snippet?.title || '',
+    description: item.snippet?.description || '',
+    publishedAt: item.snippet?.publishedAt || '',
+    thumbnailUrl: item.snippet?.thumbnails?.medium?.url || '',
+    viewCount: parseInt(item.statistics?.viewCount || '0'),
+    likeCount: parseInt(item.statistics?.likeCount || '0'),
+    commentCount: parseInt(item.statistics?.commentCount || '0'),
+    duration: item.contentDetails?.duration || '',
+  }));
+
+  return { videos, nextPageToken: plData.nextPageToken };
 }
 
-// Get channel videos
-export async function getChannelVideos(channelId: string): Promise<any[]> {
-  return await fetchChannelVideos(channelId);
+// Get analytics data for a channel
+export async function getChannelAnalytics(
+  accessToken: string,
+  channelId: string,
+  startDate: string,
+  endDate: string
+): Promise<YouTubeAnalyticsRow[]> {
+  const params = new URLSearchParams({
+    ids: `channel==${channelId}`,
+    startDate,
+    endDate,
+    metrics: 'views,estimatedRevenue,subscribersGained,subscribersLost,estimatedMinutesWatched,averageViewDuration,likes,comments,shares',
+    dimensions: 'day',
+    sort: 'day',
+  });
+
+  const response = await fetch(`${YOUTUBE_ANALYTICS_BASE}/reports?${params}`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(`YouTube Analytics API error: ${error.error?.message || response.statusText}`);
+  }
+
+  const data = await response.json();
+  const rows = data.rows || [];
+
+  return rows.map((row: (string | number)[]) => ({
+    date: row[0] as string,
+    views: Number(row[1]),
+    estimatedRevenue: Number(row[2]),
+    subscribersGained: Number(row[3]),
+    subscribersLost: Number(row[4]),
+    watchTimeMinutes: Number(row[5]),
+    averageViewDuration: Number(row[6]),
+    likes: Number(row[7]),
+    comments: Number(row[8]),
+    shares: Number(row[9]),
+  }));
 }
 
-export { channelConfig };
+// Validate credentials by testing a simple API call
+export async function validateCredentials(
+  client_id: string,
+  client_secret: string
+): Promise<boolean> {
+  try {
+    const response = await fetch(GOOGLE_TOKEN_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        client_id,
+        client_secret,
+        grant_type: 'client_credentials',
+      }),
+    });
+    // client_credentials grant type may fail but we just check if the credentials are recognized
+    const text = await response.text();
+    // If we get "invalid_client" it means credentials are wrong
+    return !text.includes('invalid_client');
+  } catch {
+    return false;
+  }
+}
