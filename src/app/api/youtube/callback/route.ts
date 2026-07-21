@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
 import { exchangeCodeForTokens, getChannelInfo } from '@/lib/youtube/api';
-import { getCredentials } from '../credentials/route';
 
 // GET: OAuth2 callback handler
 export async function GET(request: NextRequest) {
@@ -35,7 +34,12 @@ export async function GET(request: NextRequest) {
     const client = getSupabaseClient();
 
     // Use credentials from environment variables
-    const credential = getCredentials();
+    const credential = {
+      client_id: process.env.YOUTUBE_CLIENT_ID || '',
+      client_secret: process.env.YOUTUBE_CLIENT_SECRET || '',
+      redirect_uri: process.env.YOUTUBE_REDIRECT_URI || '',
+      name: 'YouTube 数据看板',
+    };
 
     if (!credential.client_id || !credential.client_secret) {
       const redirectUrl = new URL('/youtube-auth', request.url);
