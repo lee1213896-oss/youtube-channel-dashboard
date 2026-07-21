@@ -67,7 +67,7 @@ export async function GET(request: NextRequest) {
     const { data: savedChannel, error: saveError } = await client
       .from('youtube_channels')
       .upsert({
-        credential_id: credential.id,
+        credential_id: 'env',
         yt_channel_id: channelInfo.id,
         channel_name: channelInfo.title,
         channel_thumbnail: channelInfo.thumbnail,
@@ -89,7 +89,7 @@ export async function GET(request: NextRequest) {
       const { data: insertData, error: insertError } = await client
         .from('youtube_channels')
         .insert({
-          credential_id: credential.id,
+          credential_id: 'env',
           yt_channel_id: channelInfo.id,
           channel_name: channelInfo.title,
           channel_thumbnail: channelInfo.thumbnail,
