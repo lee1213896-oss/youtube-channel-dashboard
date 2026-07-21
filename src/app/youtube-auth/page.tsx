@@ -153,6 +153,7 @@ export default function YouTubeAuthPage() {
         name: newCredName || 'Default',
       }),
     });
+    const data = await res.json();
     if (res.ok) {
       setShowAddCredential(false);
       setNewCredName('');
@@ -160,6 +161,8 @@ export default function YouTubeAuthPage() {
       setNewCredClientSecret('');
       setNewCredRedirectUri('');
       fetchData();
+    } else {
+      setMessage({ type: 'error', text: data.error || '保存凭据失败' });
     }
   };
 
