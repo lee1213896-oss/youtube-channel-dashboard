@@ -115,14 +115,10 @@ export default function YouTubeAuthPage() {
     if (credentials.length === 0) return;
     setAuthorizing(true);
     try {
-      const res = await fetch(`/api/youtube/auth?credential_id=${credentials[0].id}`);
-      const data = await res.json();
-      if (data.auth_url) {
-        window.open(data.auth_url, '_blank');
-      }
+      // Use GET to directly redirect to Google auth page
+      window.location.href = `/api/youtube/auth?credential_id=${credentials[0].id}`;
     } catch (err) {
       console.error('Authorization failed:', err);
-    } finally {
       setAuthorizing(false);
     }
   };
