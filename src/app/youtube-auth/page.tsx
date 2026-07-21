@@ -178,7 +178,7 @@ export default function YouTubeAuthPage() {
     const res = await fetch('/api/youtube/sync', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ channel_id: channelId }),
+      body: JSON.stringify({ channel_id: channelId, start_date: '2026-07-01' }),
     });
     const data = await res.json();
     if (data.success) {
@@ -601,7 +601,7 @@ export default function YouTubeAuthPage() {
                       <span className="flex items-center justify-center h-5 w-5 rounded-full bg-primary/20 text-primary text-xs">6</span>
                       授权频道并同步数据
                     </h4>
-                    <p>每个 YouTube 频道需要单独授权。授权后，点击「同步」按钮拉取频道数据。YouTube 数据存在 T+1~T+2 延迟，收益数据通常 T+2。</p>
+                    <p>每个 YouTube 频道需要单独授权。授权后，点击「同步」按钮拉取频道数据（默认从 2026-07-01 开始）。YouTube 数据存在 T+1~T+2 延迟，收益数据通常 T+2。</p>
                   </div>
                 </div>
               </div>

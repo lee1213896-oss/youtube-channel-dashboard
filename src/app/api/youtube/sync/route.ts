@@ -64,9 +64,9 @@ export async function POST(request: NextRequest) {
           .eq('id', channel.id);
       }
 
-      // Sync analytics data
+      // Sync analytics data (default from 2026-07-01)
       const endDate = end_date || new Date().toISOString().split('T')[0];
-      const startDate = start_date || new Date(Date.now() - 30 * 86400000).toISOString().split('T')[0];
+      const startDate = start_date || '2026-07-01';
       const analytics = await getChannelAnalytics(accessToken, channel.yt_channel_id, startDate, endDate);
 
       // Upsert analytics data
