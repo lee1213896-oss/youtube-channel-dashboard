@@ -305,6 +305,16 @@ export default function DashboardPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
+                  {channels.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={11} className="text-center py-12">
+                        <p className="text-muted-foreground">暂无已授权的 YouTube 频道</p>
+                        <p className="text-sm text-muted-foreground mt-1">
+                          请前往「频道授权」页面添加并授权 YouTube 频道
+                        </p>
+                      </TableCell>
+                    </TableRow>
+                  )}
                   {channels.map((ch, idx) => (
                     <TableRow key={ch.id} className="border-border hover:bg-accent/30">
                       <TableCell className="text-muted-foreground tabular-nums">{(page - 1) * pageSize + idx + 1}</TableCell>

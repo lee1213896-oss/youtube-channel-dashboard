@@ -1,19 +1,39 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { channelVideos, videoDailyData } from '@/lib/mock-data';
+import { getSupabaseClient } from '@/storage/database/supabase-client';
 
 export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const channelId = id;
 
-  const videos = channelVideos[channelId] || [];
+  try {
+    const client = getSupabaseClient();
+    const { data: videos } = await client
+      .from('youtube_videos')
+      .select('*')
+      .eq('channel_id', id)
+      .order('view_count', { ascending: false });
 
-  const videosWithTrend = videos.map(v => ({
-    ...v,
-    trend: videoDailyData[v.id] || [],
-  }));
-
-  return NextResponse.json({ videos: videosWithTrend });
+    return NextResponse.json({
+      videos: (videos || []).map((v: {
+        id: string; yt_video_id: string; title: string; published_at: string;
+        view_count: number; like_count: number; comment_count: number;
+      }) => ({
+        id: v.id,
+        videoId: v.yt_video_id,
+        title: v.title,
+        publishedAt: v.published_at,
+        dailyViews: v.view_count,
+        dailyRevenue: 0,
+        totalViews: v.view_count,
+        totalRevenue: 0,
+        likes: v.like_count,
+        comments: v.comment_count,
+        trend: [],
+      })),
+    });
+  } catch {
+    return NextResponse.json({ error: 'Database error' }, { status: 500 });
+  }
 }
