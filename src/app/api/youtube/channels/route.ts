@@ -19,3 +19,31 @@ export async function GET() {
     return NextResponse.json({ channels: [] });
   }
 }
+
+// DELETE: Remove a channel
+export async function DELETE(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const channelId = searchParams.get('id');
+    
+    if (!channelId) {
+      return NextResponse.json({ error: 'Channel ID is required' }, { status: 400 });
+    }
+    
+    const client = getSupabaseClient();
+    const { error } = await client
+      .from('youtube_channels')
+      .update({ is_active: false })
+      .eq('id', channelId);
+    
+    if (error) {
+      console.error('Failed to delete channel:', error);
+      return NextResponse.json({ error: 'Failed to delete channel' }, { status: 500 });
+    }
+    
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('API error:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}

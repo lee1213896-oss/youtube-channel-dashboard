@@ -124,9 +124,15 @@ export default function YouTubeAuthPage() {
       const chData = await chRes.json();
       setCredentials(credData.credentials || []);
       setChannels(chData.channels || []);
+      // Show warning if credentials are not configured
+      if (credData.warning) {
+        setMessage({ type: 'error', text: credData.warning });
+      }
     } catch (error) {
       console.error('Failed to fetch data:', error);
-      setMessage({ type: 'error', text: '加载数据失败，请刷新页面重试' });
+      // Don't show error message, just set empty data
+      setCredentials([]);
+      setChannels([]);
     } finally {
       setLoading(false);
     }
