@@ -115,15 +115,21 @@ export default function YouTubeAuthPage() {
 
   const fetchData = async () => {
     setLoading(true);
-    const [credRes, chRes] = await Promise.all([
-      fetch('/api/youtube/credentials'),
-      fetch('/api/youtube/channels'),
-    ]);
-    const credData = await credRes.json();
-    const chData = await chRes.json();
-    setCredentials(credData.credentials || []);
-    setChannels(chData.channels || []);
-    setLoading(false);
+    try {
+      const [credRes, chRes] = await Promise.all([
+        fetch('/api/youtube/credentials'),
+        fetch('/api/youtube/channels'),
+      ]);
+      const credData = await credRes.json();
+      const chData = await chRes.json();
+      setCredentials(credData.credentials || []);
+      setChannels(chData.channels || []);
+    } catch (error) {
+      console.error('Failed to fetch data:', error);
+      setMessage({ type: 'error', text: '加载数据失败，请刷新页面重试' });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleAuthorize = async () => {
