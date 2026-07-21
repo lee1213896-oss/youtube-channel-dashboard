@@ -1,34 +1,37 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-// Get OAuth credentials from environment variables
-function getCredentials() {
-  return {
-    client_id: process.env.YOUTUBE_CLIENT_ID || '',
-    client_secret: process.env.YOUTUBE_CLIENT_SECRET || '',
-    redirect_uri: process.env.YOUTUBE_REDIRECT_URI || 'https://youtube-channel-dashboard-2w725lsr6-lee121380.vercel.app/api/youtube/callback',
-    name: 'YouTube 数据看板',
-  };
-}
-
-// GET: Return environment-based credential info
+// GET: Return credentials from environment variables
 export async function GET() {
-  const envCred = getCredentials();
-  
-  if (!envCred.client_id) {
+  const clientId = process.env.YOUTUBE_CLIENT_ID;
+  const clientSecret = process.env.YOUTUBE_CLIENT_SECRET;
+  const redirectUri = process.env.YOUTUBE_REDIRECT_URI;
+
+  if (!clientId || !clientSecret || !redirectUri) {
     return NextResponse.json({ 
       credentials: [],
-      warning: 'YOUTUBE_CLIENT_ID 环境变量未配置'
+      warning: 'YouTube OAuth 凭据未配置，请在 Vercel 环境变量中添加 YOUTUBE_CLIENT_ID、YOUTUBE_CLIENT_SECRET、YOUTUBE_REDIRECT_URI'
     });
   }
-  
+
+  return NextResponse.json({
+    credentials: [
+      {
+        id: 'env',
+        name: 'YouTube 数据看板',
+        client_id: clientId,
+        client_secret: clientSecret,
+        redirect_uri: redirectUri,
+        is_active: true,
+        created_at: new Date().toISOString(),
+      },
+    ],
+  });
+}
+
+// POST: Save credentials (deprecated - now using environment variables)
+export async function POST(request: NextRequest) {
   return NextResponse.json({ 
-    credentials: [{
-      id: 'env',
-      client_id: envCred.client_id,
-      redirect_uri: envCred.redirect_uri,
-      name: envCred.name,
-      is_active: true,
-      created_at: new Date().toISOString(),
-    }]
+    success: false, 
+    error: '凭据已改为环境变量配置，请在 Vercel 项目设置中添加 YOUTUBE_CLIENT_ID、YOUTUBE_CLIENT_SECRET、YOUTUBE_REDIRECT_URI' 
   });
 }
